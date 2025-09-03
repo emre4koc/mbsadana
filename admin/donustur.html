@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel'den CSV'ye Dönüştürücü</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .upload-area {
+            border: 2px dashed #3498db;
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 20px;
+            background-color: #f8f9fa;
+            transition: all 0.3s;
+        }
+        .upload-area:hover {
+            background-color: #e8f4fc;
+            border-color: #2980b9;
+        }
+        .file-input {
+            display: none;
+        }
+        .browse-btn {
+            background-color: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        .browse-btn:hover {
+            background-color: #2980b9;
+        }
+        .convert-btn {
+            background-color: #2ecc71;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            display: block;
+            margin: 20px auto;
+            width: 200px;
+            transition: background-color 0.3s;
+        }
+        .convert-btn:hover {
+            background-color: #27ae60;
+        }
+        .convert-btn:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        .file-info {
+            margin-top: 15px;
+            font-style: italic;
+            color: #7f8c8d;
+        }
+        .status {
+            text-align: center;
+            margin: 15px 0;
+            font-weight: bold;
+            color: #2c3e50;
+            min-height: 24px;
+        }
+        .download-btn {
+            background-color: #9b59b6;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            display: none;
+            margin: 20px auto;
+            width: 200px;
+            transition: background-color 0.3s;
+        }
+        .download-btn:hover {
+            background-color: #8e44ad;
+        }
+        .instructions {
+            background-color: #f9f9f9;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 5px 5px 0;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Excel'den CSV'ye Dönüştürücü</h1>
+        
+        <div class="instructions">
+            <p><strong>Kullanım Talimatları:</strong></p>
+            <ol>
+                <li>"Dosya Seç" butonuna tıklayarak veya dosyayı sürükleyip bırakarak bir Excel dosyası (.xlsx) yükleyin</li>
+                <li>"CSV'ye Dönüştür" butonuna tıklayın</li>
+                <li>Dönüştürme tamamlandığında "CSV'yi İndir" butonu aktif hale gelecektir</li>
+                <li>Butona tıklayarak UTF-8 kodlamalı CSV dosyasını indirebilirsiniz</li>
+            </ol>
+        </div>
+        
+        <div class="upload-area" id="dropArea">
+            <p>Excel dosyasını buraya sürükleyip bırakın veya</p>
+            <input type="file" id="fileInput" class="file-input" accept=".xlsx, .xls">
+            <button class="browse-btn" onclick="document.getElementById('fileInput').click()">Dosya Seç</button>
+            <p class="file-info" id="fileInfo">Henüz dosya seçilmedi</p>
+        </div>
+        
+        <div class="status" id="status"></div>
+        
+        <button class="convert-btn" id="convertBtn" disabled>CSV'ye Dönüştür</button>
+        
+        <a class="download-btn" id="downloadBtn" download="converted.csv">CSV'yi İndir</a>
+    </div>
+    
+    <div class="footer">
+        <p>Excel'den CSV'ye Dönüştürücü | UTF-8 Kodlamalı</p>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const fileInput = document.getElementById('fileInput');
+            const dropArea = document.getElementById('dropArea');
+            const fileInfo = document.getElementById('fileInfo');
+            const convertBtn = document.getElementById('convertBtn');
+            const downloadBtn = document.getElementById('downloadBtn');
+            const status = document.getElementById('status');
+            
+            let selectedFile = null;
+            
+            // Dosya seçme olayı
+            fileInput.addEventListener('change', function(e) {
+                handleFile(e.target.files[0]);
+            });
+            
+            // Sürükle bırak olayları
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, preventDefaults, false);
+            });
+            
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropArea.addEventListener(eventName, highlight, false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, unhighlight, false);
+            });
+            
+            function highlight() {
+                dropArea.style.backgroundColor = '#e8f4fc';
+                dropArea.style.borderColor = '#2980b9';
+            }
+            
+            function unhighlight() {
+                dropArea.style.backgroundColor = '#f8f9fa';
+                dropArea.style.borderColor = '#3498db';
+            }
+            
+            dropArea.addEventListener('drop', function(e) {
+                const dt = e.dataTransfer;
+                const file = dt.files[0];
+                handleFile(file);
+            });
+            
+            function handleFile(file) {
+                if (file) {
+                    const fileName = file.name;
+                    const fileExtension = fileName.split('.').pop().toLowerCase();
+                    
+                    if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+                        selectedFile = file;
+                        fileInfo.textContent = `Seçilen dosya: ${fileName}`;
+                        convertBtn.disabled = false;
+                        status.textContent = '';
+                        downloadBtn.style.display = 'none';
+                    } else {
+                        status.textContent = 'Lütfen sadece Excel dosyası (.xlsx veya .xls) yükleyin.';
+                        status.style.color = '#e74c3c';
+                    }
+                }
+            }
+            
+            // Dönüştürme butonu
+            convertBtn.addEventListener('click', function() {
+                if (!selectedFile) {
+                    status.textContent = 'Lütfen önce bir dosya seçin.';
+                    status.style.color = '#e74c3c';
+                    return;
+                }
+                
+                status.textContent = 'Dosya dönüştürülüyor...';
+                status.style.color = '#2c3e50';
+                
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        
+                        // İlk sayfayı al
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        
+                        // CSV'ye dönüştür (UTF-8 BOM ile)
+                        const csvContent = XLSX.utils.sheet_to_csv(worksheet);
+                        
+                        // UTF-8 BOM ekle
+                        const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+                        const csvBlob = new Blob([bom, csvContent], { type: 'text/csv;charset=utf-8;' });
+                        
+                        // İndirme bağlantısını hazırla
+                        const url = URL.createObjectURL(csvBlob);
+                        downloadBtn.href = url;
+                        downloadBtn.style.display = 'block';
+                        
+                        status.textContent = 'Dönüştürme tamamlandı! CSV dosyasını indirebilirsiniz.';
+                        status.style.color = '#27ae60';
+                    } catch (error) {
+                        console.error('Dönüştürme hatası:', error);
+                        status.textContent = 'Dosya dönüştürülürken bir hata oluştu. Lütfen dosyanın geçerli bir Excel dosyası olduğundan emin olun.';
+                        status.style.color = '#e74c3c';
+                    }
+                };
+                
+                reader.onerror = function() {
+                    status.textContent = 'Dosya okunurken bir hata oluştu. Lütfen tekrar deneyin.';
+                    status.style.color = '#e74c3c';
+                };
+                
+                reader.readAsArrayBuffer(selectedFile);
+            });
+        });
+    </script>
+</body>
+</html>

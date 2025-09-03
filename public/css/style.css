@@ -1,0 +1,23 @@
+/* Genel Font ve Gövde Ayarları */
+body {
+    font-family: 'Inter', sans-serif; /* Daha modern bir font için Google Fonts'tan eklenebilir */
+}
+
+/* Sidebar'ın mobil görünümde yumuşak bir geçişle açılıp kapanması için */
+#sidebar {
+    transition: transform 0.3s ease-in-out;
+}
+
+/* Mobil görünümde sidebar gizlendiğinde */
+#sidebar.hidden {
+    transform: translateX(-100%);
+}
+
+/* Sayfaların içeriğinin kaydırılabilir olması için */
+main {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+main::-webkit-scrollbar {
+    display: none; /* Chrome, Safari and Opera */
+}
